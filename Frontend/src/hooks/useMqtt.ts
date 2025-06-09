@@ -4,9 +4,24 @@ import { saveTrafficDataManually } from "../services/api";
 import { MQTTTrafficData } from "../services/interface";
 
 const MQTT_BROKER_URL = "ws://103.245.38.40:9001/mqtt";
-const TOPIC = "vehicle/interactions";
 
 const useMQTT = (billboardName?: string) => {
+  // Determine MQTT topic based on billboard name
+  const getTopic = (billboard?: string): string => {
+    if (billboard === "A") {
+      return "vehicle/interactions";
+    } else if (billboard === "B") {
+      return "vehicle/interactions2";
+    } else if (billboard === "C") {
+      return "vehicle/interactions3";
+    } else {
+      // Default fallback
+      return "vehicle/interactions2";
+    }
+  };
+
+  const TOPIC = getTopic(billboardName);
+
   // Data MQTT yang diterima
   const [trafficData, setTrafficData] = useState<MQTTTrafficData>({
     car_down: 0,
@@ -23,6 +38,7 @@ const useMQTT = (billboardName?: string) => {
   const [timeUntilNextHour, setTimeUntilNextHour] = useState<number>(0);
 
   const mqttClientRef = useRef<mqtt.MqttClient | null>(null);
+
   // Fungsi untuk menghitung waktu sampai jam berikutnya
   const calculateTimeUntilNextHour = () => {
     const now = new Date();
@@ -73,10 +89,16 @@ const useMQTT = (billboardName?: string) => {
 
     client.on("connect", () => {
       console.log(
-        `Connected to MQTT broker for billboard ${billboardName || "all"}`
+        `Connected to MQTT broker for billboard ${
+          billboardName || "all"
+        } using topic: ${TOPIC}`
       );
       client.subscribe(TOPIC, (err) => {
-        if (!err) console.log(`Subscribed to ${TOPIC}`);
+        if (!err) {
+          console.log(`Subscribed to ${TOPIC} for billboard ${billboardName}`);
+        } else {
+          console.error(`Failed to subscribe to ${TOPIC}:`, err);
+        }
       });
     });
 
@@ -84,6 +106,7 @@ const useMQTT = (billboardName?: string) => {
       if (topic === TOPIC) {
         try {
           const payload = JSON.parse(message.toString()) as MQTTTrafficData;
+          console.log(`Received data for billboard ${billboardName}:`, payload);
           setTrafficData(payload);
         } catch (error) {
           console.error("Error parsing MQTT message:", error);
@@ -91,11 +114,18 @@ const useMQTT = (billboardName?: string) => {
       }
     });
 
+    client.on("error", (error) => {
+      console.error("MQTT connection error:", error);
+    });
+
     return () => {
-      client.end();
-      mqttClientRef.current = null;
+      if (mqttClientRef.current) {
+        console.log(`Disconnecting from MQTT topic: ${TOPIC}`);
+        mqttClientRef.current.end();
+        mqttClientRef.current = null;
+      }
     };
-  }, [billboardName]);
+  }, [billboardName, TOPIC]); // Add TOPIC to dependencies
 
   // Menghitung big vehicle dari data MQTT (untuk tampilan UI)
   const big_vehicle_down = trafficData.truck_down + trafficData.bus_down;
@@ -122,6 +152,9 @@ const useMQTT = (billboardName?: string) => {
 
     // Fungsi untuk reset manual
     resetData: saveDataManually,
+
+    // Current topic (for debugging)
+    currentTopic: TOPIC,
   };
 };
 

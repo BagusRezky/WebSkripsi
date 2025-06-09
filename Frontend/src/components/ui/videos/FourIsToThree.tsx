@@ -2,12 +2,27 @@ import Hls from "hls.js";
 import useHLS from "../../../hooks/useHls";
 
 interface FourIsToThreeProps {
-  streamUrl?: string;
+  billboardName?: string;
 }
 
 export default function FourIsToThree({
-  streamUrl = "https://streaming.theaida.id/hls/test.m3u8",
+  billboardName = "A",
 }: FourIsToThreeProps) {
+  // Determine stream URL based on billboard name
+  const getStreamUrl = (billboard: string): string => {
+    if (billboard === "A") {
+      return "https://streaming.theaida.id/hls/test.m3u8";
+    } else if (billboard === "B") {
+      return "https://streaming.theaida.id/hls/test2.m3u8";
+    } else if (billboard === "C") {
+      return "https://streaming.theaida.id/hls/test3.m3u8";
+    } else {
+      // Default fallback
+      return "https://streaming.theaida.id/hls/test.m3u8";
+    }
+  };
+
+  const streamUrl = getStreamUrl(billboardName);
   const { videoRef, canPlayHLS } = useHLS(streamUrl);
 
   return (
